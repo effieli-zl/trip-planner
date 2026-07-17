@@ -29,6 +29,9 @@ list in the same change.**
   vision, users, feature modules F1–F9, and MVP vs. Phase 2 scope.
 
 ### Internal build docs (`docs/`)
+- **Phase 0 (AI Skill)**
+  - [docs/phase-0/data-model.html](./docs/phase-0/data-model.html) — itinerary data
+    model: entity/column definitions + relationships. Expandable HTML. _Draft, under review._
 - **Project management**
   - [docs/project-management/roadmap.md](./docs/project-management/roadmap.md) —
     phases, milestones, dev-step order, decision log.
