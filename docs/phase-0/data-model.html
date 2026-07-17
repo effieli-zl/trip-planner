@@ -74,13 +74,14 @@
   .rel td.c{font-family:ui-monospace,Menlo,monospace;white-space:nowrap;color:var(--accent)}
   ul.dec{margin:0;padding-left:18px}ul.dec li{margin:7px 0}
   .rec{color:var(--accent);font-weight:600}
-  /* containment tree */
   .tree{font-size:14px;line-height:1.5}
   .tree .node{border-left:2px solid var(--border);margin-left:6px;padding-left:16px;position:relative}
   .tree .node::before{content:"";position:absolute;left:-2px;top:14px;width:12px;height:0;border-top:2px solid var(--border)}
   .tree .row{padding:6px 0}
   .tname{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:var(--mono)}
   .tmeta{color:var(--muted);font-size:12.5px}
+  .badge{display:inline-block;font-size:11px;color:var(--accent);border:1px solid var(--border);
+    background:var(--accent-soft);border-radius:5px;padding:0 6px;margin-left:6px}
   .l0>.row .tname{color:var(--accent);font-size:15px}
   footer{color:var(--muted);font-size:12px;margin-top:40px;text-align:center}
   a{color:var(--accent)}
@@ -90,23 +91,23 @@
 <div class="wrap">
   <header>
     <h1>Trip Planner — Phase 0 Data Model</h1>
-    <p class="sub">Normalized, relational. The itinerary is the single source of truth; one uniform <span class="ent">Entry</span> record, with people and money split into their own tables so costs and companions can be tracked per person.</p>
-    <p class="sub">Standalone, file-backed (<code class="t">trips/&lt;slug&gt;/itinerary.json</code>), validated against a versioned schema. A durable contract a future app/connector can consume.</p>
-    <span class="ver">schemaVersion 0.2.0 · draft for review</span>
+    <p class="sub">A <span class="ent">Trip</span> is the wrapper — it owns the <b>budget</b> and the <b>people</b>. It contains one or more <span class="ent">Itineraries</span> (plan variants) you draft and compare during planning; each itinerary's cost rolls up and is measured against the trip budget. The <i>selected</i> itinerary is the source of truth for the actual trip.</p>
+    <p class="sub">Standalone, file-backed (<code class="t">trips/&lt;slug&gt;/trip.json</code>), validated against a versioned schema. A durable contract a future app/connector can consume.</p>
+    <span class="ver">schemaVersion 0.3.0 · draft for review</span>
   </header>
 
   <h2>Hierarchy (containment)</h2>
   <div class="card"><div class="body">
-    <p class="lead">Parent → child ownership. Junction tables (below) wire the many-to-many links across branches.</p>
+    <p class="lead">Parent → child ownership. Budget and Members sit on the Trip; plan detail lives inside each Itinerary variant.</p>
     <div class="tree">
-      <div class="node l0"><div class="row"><span class="tname">Itinerary</span> <span class="tmeta">— root · schemaVersion</span></div>
-        <div class="node"><div class="row"><span class="tname">Trip</span> <span class="tmeta">— id, name, start/end date <b>(rollup from sub-tables)</b></span></div>
+      <div class="node l0"><div class="row"><span class="tname">Trip</span> <span class="tmeta">— wrapper · id, name, <b>budget target</b>, base currency, people</span></div>
+        <div class="node"><div class="row"><span class="tname">Itinerary</span> <span class="badge">1 : many</span> <span class="tmeta">— a plan variant · status: draft · selected · archived; dates <b>(rollup)</b>; cost compared to trip budget</span></div>
           <div class="node"><div class="row"><span class="tname">Location</span> <span class="tmeta">— start/end date · <b>overlap warning</b> when 2 locations overlap ≥2 days (dismissible)</span></div></div>
           <div class="node"><div class="row"><span class="tname">Entry</span> <span class="tmeta">— type: Lodging · Transportation · Activity · Dining; subtype, start/end date-time</span></div>
             <div class="node"><div class="row"><span class="tname">Finance</span> <span class="tmeta">— total, estimate⇄confirmed, paid, unpaid (derived)</span></div></div>
           </div>
-          <div class="node"><div class="row"><span class="tname">Member</span> <span class="tmeta">— role: Owner · Coordinator · Participant · Follower; traveling flag</span></div></div>
         </div>
+        <div class="node"><div class="row"><span class="tname">Member</span> <span class="badge">1 : many</span> <span class="tmeta">— people on the trip · role: Owner · Coordinator · Participant · Follower; traveling flag</span></div></div>
       </div>
     </div>
   </div></div>
@@ -115,7 +116,7 @@
   <div class="card"><div class="body">
     <p class="lead">Crow's-foot notation. <code class="t">|</code> one · <code class="t">&lt;</code> many. Dashed = optional reference. Junctions (Location–Member, Finance–Member) resolve the many-to-many links.</p>
     <div class="scroll">
-      <svg class="diagram" viewBox="0 0 1060 640" width="1060" role="img" aria-label="Entity relationship diagram">
+      <svg class="diagram" viewBox="0 0 1060 700" width="1060" role="img" aria-label="Entity relationship diagram">
         <style>
           .eb{fill:var(--card);stroke:var(--border);stroke-width:1.5}
           .eh{fill:var(--accent-soft)}
@@ -139,143 +140,161 @@
           </marker>
         </defs>
 
-        <!-- ===== connectors (drawn first, under boxes) ===== -->
-        <!-- Itinerary -> Trip : 1..* -->
-        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M155,90 L155,168"/>
-        <text class="card2" x="163" y="132">1 : *</text>
-        <!-- Trip -> Location : 1..* -->
-        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M150,248 L155,348"/>
-        <text class="card2" x="105" y="305">1 : *</text>
-        <!-- Trip -> Entry : 1..* (orthogonal) -->
-        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M240,208 L420,208 L420,348"/>
-        <text class="card2" x="430" y="300">1 : *</text>
-        <!-- Trip -> Member : 1..* (long horizontal) -->
-        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M240,196 L845,196 L845,214"/>
-        <text class="card2" x="520" y="188">1 : *</text>
+        <!-- ===== connectors ===== -->
+        <!-- Trip -> Itinerary : 1..* -->
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M470,120 L470,150 L340,150 L340,178"/>
+        <text class="card2" x="352" y="143">1 : *</text>
+        <!-- Trip -> Member : 1..* -->
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M600,120 L600,150 L850,150 L850,188"/>
+        <text class="card2" x="700" y="143">1 : *</text>
+        <!-- Itinerary -> Location : 1..* -->
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M300,273 L160,273 L160,378"/>
+        <text class="card2" x="168" y="330">1 : *</text>
+        <!-- Itinerary -> Entry : 1..* -->
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M360,273 L420,273 L420,378"/>
+        <text class="card2" x="430" y="330">1 : *</text>
         <!-- Entry -> Finance : 1..1 -->
-        <path class="ln2" marker-start="url(#bar)" marker-end="url(#bar)" d="M420,428 L420,498"/>
-        <text class="card2" x="428" y="468">1 : 1</text>
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#bar)" d="M420,456 L420,538"/>
+        <text class="card2" x="428" y="505">1 : 1</text>
         <!-- Entry .. Location : optional ref 0..1 -->
-        <path class="ln2 dash" marker-start="url(#crow)" marker-end="url(#bar)" d="M328,405 L252,405"/>
-        <text class="card2" x="258" y="396">0..1</text>
+        <path class="ln2 dash" marker-start="url(#crow)" marker-end="url(#bar)" d="M328,415 L252,415"/>
+        <text class="card2" x="262" y="406">0..1</text>
         <!-- Location -> LocationMember : 1..* -->
-        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M250,388 L596,388"/>
-        <text class="card2" x="410" y="380">1 : *</text>
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M250,418 L596,418"/>
+        <text class="card2" x="410" y="410">1 : *</text>
         <!-- LocationMember -> Member : *..1 -->
-        <path class="ln2" marker-start="url(#crow)" marker-end="url(#bar)" d="M800,378 L955,378 L955,262"/>
-        <text class="card2" x="905" y="330">* : 1</text>
+        <path class="ln2" marker-start="url(#crow)" marker-end="url(#bar)" d="M804,405 L850,405 L850,268"/>
+        <text class="card2" x="812" y="350">* : 1</text>
         <!-- Finance -> FinanceMember : 1..* -->
-        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M510,536 L596,536"/>
-        <text class="card2" x="540" y="528">1 : *</text>
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M510,578 L596,578"/>
+        <text class="card2" x="540" y="570">1 : *</text>
         <!-- FinanceMember -> Member : *..1 -->
-        <path class="ln2" marker-start="url(#crow)" marker-end="url(#bar)" d="M800,530 L905,530 L905,258"/>
-        <text class="card2" x="850" y="430">* : 1</text>
+        <path class="ln2" marker-start="url(#crow)" marker-end="url(#bar)" d="M804,560 L888,560 L888,262"/>
+        <text class="card2" x="852" y="430">* : 1</text>
 
         <!-- ===== entity boxes ===== -->
+        <!-- Trip (root wrapper) -->
+        <g><rect class="eb" x="410" y="24" width="200" height="96" rx="8"/><rect class="eh" x="410" y="24" width="200" height="24" rx="8"/><line class="sep" x1="410" y1="48" x2="610" y2="48"/>
+          <text class="etitle" x="422" y="41">Trip</text>
+          <text class="ef" x="422" y="66">id <tspan class="kk">PK</tspan></text>
+          <text class="ef" x="422" y="85">budgetTarget</text>
+          <text class="ef" x="422" y="104">baseCurrency</text></g>
         <!-- Itinerary -->
-        <g><rect class="eb" x="70" y="30" width="170" height="60" rx="8"/><rect class="eh" x="70" y="30" width="170" height="24" rx="8"/><line class="sep" x1="70" y1="54" x2="240" y2="54"/>
-          <text class="etitle" x="82" y="47">Itinerary</text>
-          <text class="ef" x="82" y="72">id <tspan class="kk">PK</tspan></text></g>
-        <!-- Trip -->
-        <g><rect class="eb" x="70" y="170" width="170" height="78" rx="8"/><rect class="eh" x="70" y="170" width="170" height="24" rx="8"/><line class="sep" x1="70" y1="194" x2="240" y2="194"/>
-          <text class="etitle" x="82" y="187">Trip</text>
-          <text class="ef" x="82" y="212">id <tspan class="kk">PK</tspan></text>
-          <text class="ef" x="82" y="231">itineraryId <tspan class="kk">FK</tspan></text></g>
-        <!-- Location -->
-        <g><rect class="eb" x="70" y="350" width="180" height="78" rx="8"/><rect class="eh" x="70" y="350" width="180" height="24" rx="8"/><line class="sep" x1="70" y1="374" x2="250" y2="374"/>
-          <text class="etitle" x="82" y="367">Location</text>
-          <text class="ef" x="82" y="392">id <tspan class="kk">PK</tspan></text>
-          <text class="ef" x="82" y="411">tripId <tspan class="kk">FK</tspan></text></g>
-        <!-- Entry -->
-        <g><rect class="eb" x="330" y="350" width="180" height="78" rx="8"/><rect class="eh" x="330" y="350" width="180" height="24" rx="8"/><line class="sep" x1="330" y1="374" x2="510" y2="374"/>
-          <text class="etitle" x="342" y="367">Entry</text>
-          <text class="ef" x="342" y="392">id <tspan class="kk">PK</tspan></text>
-          <text class="ef" x="342" y="411">tripId <tspan class="kk">FK</tspan> · locationId <tspan class="kk">FK?</tspan></text></g>
-        <!-- Finance -->
-        <g><rect class="eb" x="330" y="500" width="180" height="78" rx="8"/><rect class="eh" x="330" y="500" width="180" height="24" rx="8"/><line class="sep" x1="330" y1="524" x2="510" y2="524"/>
-          <text class="etitle" x="342" y="517">Finance</text>
-          <text class="ef" x="342" y="542">id <tspan class="kk">PK</tspan></text>
-          <text class="ef" x="342" y="561">entryId <tspan class="kk">FK</tspan></text></g>
+        <g><rect class="eb" x="250" y="180" width="180" height="93" rx="8"/><rect class="eh" x="250" y="180" width="180" height="24" rx="8"/><line class="sep" x1="250" y1="204" x2="430" y2="204"/>
+          <text class="etitle" x="262" y="197">Itinerary</text>
+          <text class="ef" x="262" y="222">id <tspan class="kk">PK</tspan></text>
+          <text class="ef" x="262" y="241">tripId <tspan class="kk">FK</tspan></text>
+          <text class="ef" x="262" y="260">status</text></g>
         <!-- Member -->
-        <g><rect class="eb" x="840" y="182" width="180" height="78" rx="8"/><rect class="eh" x="840" y="182" width="180" height="24" rx="8"/><line class="sep" x1="840" y1="206" x2="1020" y2="206"/>
-          <text class="etitle" x="852" y="199">Member</text>
-          <text class="ef" x="852" y="224">id <tspan class="kk">PK</tspan></text>
-          <text class="ef" x="852" y="243">tripId <tspan class="kk">FK</tspan></text></g>
+        <g><rect class="eb" x="760" y="190" width="180" height="78" rx="8"/><rect class="eh" x="760" y="190" width="180" height="24" rx="8"/><line class="sep" x1="760" y1="214" x2="940" y2="214"/>
+          <text class="etitle" x="772" y="207">Member</text>
+          <text class="ef" x="772" y="232">id <tspan class="kk">PK</tspan></text>
+          <text class="ef" x="772" y="251">tripId <tspan class="kk">FK</tspan></text></g>
+        <!-- Location -->
+        <g><rect class="eb" x="70" y="380" width="180" height="78" rx="8"/><rect class="eh" x="70" y="380" width="180" height="24" rx="8"/><line class="sep" x1="70" y1="404" x2="250" y2="404"/>
+          <text class="etitle" x="82" y="397">Location</text>
+          <text class="ef" x="82" y="422">id <tspan class="kk">PK</tspan></text>
+          <text class="ef" x="82" y="441">itineraryId <tspan class="kk">FK</tspan></text></g>
+        <!-- Entry -->
+        <g><rect class="eb" x="330" y="380" width="180" height="78" rx="8"/><rect class="eh" x="330" y="380" width="180" height="24" rx="8"/><line class="sep" x1="330" y1="404" x2="510" y2="404"/>
+          <text class="etitle" x="342" y="397">Entry</text>
+          <text class="ef" x="342" y="422">id <tspan class="kk">PK</tspan></text>
+          <text class="ef" x="342" y="441">itineraryId <tspan class="kk">FK</tspan> · locationId <tspan class="kk">FK?</tspan></text></g>
+        <!-- Finance -->
+        <g><rect class="eb" x="330" y="540" width="180" height="78" rx="8"/><rect class="eh" x="330" y="540" width="180" height="24" rx="8"/><line class="sep" x1="330" y1="564" x2="510" y2="564"/>
+          <text class="etitle" x="342" y="557">Finance</text>
+          <text class="ef" x="342" y="582">id <tspan class="kk">PK</tspan></text>
+          <text class="ef" x="342" y="601">entryId <tspan class="kk">FK</tspan></text></g>
         <!-- LocationMember (junction) -->
-        <g class="jt"><rect class="eb" x="596" y="350" width="204" height="78" rx="8"/><rect class="eh" x="596" y="350" width="204" height="24" rx="8"/><line class="sep" x1="596" y1="374" x2="800" y2="374"/>
-          <text class="etitle" x="608" y="367">LocationMember</text>
-          <text class="ef" x="608" y="392">locationId <tspan class="kk">FK</tspan></text>
-          <text class="ef" x="608" y="411">memberId <tspan class="kk">FK</tspan></text></g>
+        <g class="jt"><rect class="eb" x="596" y="380" width="208" height="78" rx="8"/><rect class="eh" x="596" y="380" width="208" height="24" rx="8"/><line class="sep" x1="596" y1="404" x2="804" y2="404"/>
+          <text class="etitle" x="608" y="397">LocationMember</text>
+          <text class="ef" x="608" y="422">locationId <tspan class="kk">FK</tspan></text>
+          <text class="ef" x="608" y="441">memberId <tspan class="kk">FK</tspan></text></g>
         <!-- FinanceMember (junction) -->
-        <g class="jt"><rect class="eb" x="596" y="500" width="204" height="78" rx="8"/><rect class="eh" x="596" y="500" width="204" height="24" rx="8"/><line class="sep" x1="596" y1="524" x2="800" y2="524"/>
-          <text class="etitle" x="608" y="517">FinanceMember</text>
-          <text class="ef" x="608" y="542">financeId <tspan class="kk">FK</tspan></text>
-          <text class="ef" x="608" y="561">memberId <tspan class="kk">FK</tspan></text></g>
+        <g class="jt"><rect class="eb" x="596" y="540" width="208" height="78" rx="8"/><rect class="eh" x="596" y="540" width="208" height="24" rx="8"/><line class="sep" x1="596" y1="564" x2="804" y2="564"/>
+          <text class="etitle" x="608" y="557">FinanceMember</text>
+          <text class="ef" x="608" y="582">financeId <tspan class="kk">FK</tspan></text>
+          <text class="ef" x="608" y="601">memberId <tspan class="kk">FK</tspan></text></g>
       </svg>
     </div>
-    <div class="note"><b>Why the split:</b> <span class="ent">Member</span>, <span class="ent">LocationMember</span>, and <span class="ent">FinanceMember</span> let one entry's cost be divided across people (who's on which leg, who owes what, who paid) without duplicating entries — the relational backbone for group trips.</div>
+    <div class="note"><b>Why the split:</b> Trip holds the <b>budget</b> and the <b>people</b>; each <span class="ent">Itinerary</span> is a self-contained plan variant whose cost (Σ Finance) is compared against the trip budget. <span class="ent">LocationMember</span> and <span class="ent">FinanceMember</span> divide legs and costs across trip members without duplicating entries.</div>
   </div></div>
 
   <h2>Entities &amp; column definitions</h2>
   <p class="lead"><span class="req">●</span> required · <span class="opt">○</span> optional · <span class="pk">PK</span> key · <span class="fk">FK</span> foreign key · <span class="drv">⟲</span> derived.</p>
 
-  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">Trip</span> <span class="desc">the trip; dates roll up from children</span></summary>
+  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">Trip</span> <span class="desc">root wrapper — budget + people</span></summary>
     <div class="body scroll"><table>
       <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td class="f">id</td><td><code class="t">string</code> <span class="pk">PK</span></td><td><span class="req">●</span></td><td>Stable id / slug.</td></tr>
-        <tr><td class="f">itineraryId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Itinerary.id (root container).</td></tr>
-        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Trip name.</td></tr>
-        <tr><td class="f">startDate</td><td><code class="t">date</code> <span class="drv">⟲</span></td><td><span class="opt">○</span></td><td><b>Rollup:</b> earliest Location/Entry date. Manual override allowed.</td></tr>
-        <tr><td class="f">endDate</td><td><code class="t">date</code> <span class="drv">⟲</span></td><td><span class="opt">○</span></td><td><b>Rollup:</b> latest Location/Entry date.</td></tr>
-        <tr><td class="f">baseCurrency</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>ISO 4217; default for Finance currency.</td></tr>
+        <tr><td class="f">id</td><td><code class="t">string</code> <span class="pk">PK</span></td><td><span class="req">●</span></td><td>Stable id / slug. Root of the file.</td></tr>
+        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>e.g. "Patagonia 2026".</td></tr>
+        <tr><td class="f">budgetTarget</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>Overall spend target/cap, in <code class="t">baseCurrency</code>. Itinerary costs are compared to this.</td></tr>
+        <tr><td class="f">baseCurrency</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>ISO 4217; default for Finance currency &amp; the budget.</td></tr>
+        <tr><td class="f">targetStartDate</td><td><code class="t">date</code></td><td><span class="opt">○</span></td><td>Optional intended window start (itineraries may differ).</td></tr>
+        <tr><td class="f">targetEndDate</td><td><code class="t">date</code></td><td><span class="opt">○</span></td><td>Optional intended window end.</td></tr>
         <tr><td class="f">visibility</td><td><code class="t">enum</code></td><td><span class="opt">○</span></td><td><span class="pill">private</span><span class="pill">friends</span><span class="pill">public</span> — recorded, not enforced (forward-looking).</td></tr>
         <tr><td class="f">notes</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Freeform.</td></tr>
       </tbody>
     </table></div>
   </details></div>
 
-  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">Location</span> <span class="desc">a place/leg of the trip</span></summary>
+  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">Itinerary</span> <span class="desc">a plan variant you draft &amp; compare</span></summary>
     <div class="body">
       <div class="scroll"><table>
       <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td class="f">id</td><td><code class="t">string</code> <span class="pk">PK</span></td><td><span class="req">●</span></td><td>Stable id.</td></tr>
         <tr><td class="f">tripId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Trip.id.</td></tr>
-        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>e.g. "Buenos Aires".</td></tr>
-        <tr><td class="f">startDate</td><td><code class="t">date</code></td><td><span class="req">●</span></td><td>Arrive.</td></tr>
-        <tr><td class="f">endDate</td><td><code class="t">date</code></td><td><span class="req">●</span></td><td>Leave.</td></tr>
-        <tr><td class="f">overlapCleared</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>User dismissed the overlap warning (see rule below). Default false.</td></tr>
-        <tr><td class="f">lat / lng</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>For a future map view.</td></tr>
+        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Label, e.g. "Plan A — beach-heavy".</td></tr>
+        <tr><td class="f">status</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">draft</span><span class="pill">selected</span><span class="pill">archived</span> — one <code class="t">selected</code> is the live plan; costs/allocations count for it.</td></tr>
+        <tr><td class="f">startDate</td><td><code class="t">date</code> <span class="drv">⟲</span></td><td><span class="opt">○</span></td><td><b>Rollup:</b> earliest child date. Override allowed.</td></tr>
+        <tr><td class="f">endDate</td><td><code class="t">date</code> <span class="drv">⟲</span></td><td><span class="opt">○</span></td><td><b>Rollup:</b> latest child date.</td></tr>
+        <tr><td class="f">notes</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Why this variant / trade-offs.</td></tr>
       </tbody>
       </table></div>
-      <div class="warnbox">⚠️ <b>Overlap rule:</b> if two of a trip's locations overlap by <b>≥ 2 days</b>, raise a dismissible warning (you can't be two places at once for that long). A ≤1-day overlap is treated as a travel/handoff day and passes silently. The user can clear it via <code class="t">overlapCleared</code>.</div>
+      <div class="note"><b>Budget comparison:</b> each itinerary's rolled-up cost (Σ Finance of its entries) is shown against <code class="t">Trip.budgetTarget</code> — <span class="rec">under / over by X</span> — so variants can be compared side by side before one is <code class="t">selected</code>.</div>
     </div>
   </details></div>
 
-  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">Entry</span> <span class="desc">the uniform itinerary record</span></summary>
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">Location</span> <span class="desc">a place/leg within an itinerary</span></summary>
     <div class="body">
       <div class="scroll"><table>
       <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td class="f">id</td><td><code class="t">string</code> <span class="pk">PK</span></td><td><span class="req">●</span></td><td>Stable id.</td></tr>
-        <tr><td class="f">tripId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Trip.id.</td></tr>
+        <tr><td class="f">itineraryId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Itinerary.id.</td></tr>
+        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>e.g. "Buenos Aires".</td></tr>
+        <tr><td class="f">startDate / endDate</td><td><code class="t">date</code></td><td><span class="req">●</span></td><td>Arrive / leave.</td></tr>
+        <tr><td class="f">overlapCleared</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>User dismissed the overlap warning. Default false.</td></tr>
+        <tr><td class="f">lat / lng</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>For a future map view.</td></tr>
+      </tbody>
+      </table></div>
+      <div class="warnbox">⚠️ <b>Overlap rule:</b> within an itinerary, if two locations overlap by <b>≥ 2 days</b>, raise a dismissible warning. A ≤1-day overlap = travel/handoff day, passes silently. Cleared via <code class="t">overlapCleared</code>.</div>
+    </div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">Entry</span> <span class="desc">the uniform itinerary record</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">id</td><td><code class="t">string</code> <span class="pk">PK</span></td><td><span class="req">●</span></td><td>Stable id.</td></tr>
+        <tr><td class="f">itineraryId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Itinerary.id.</td></tr>
         <tr><td class="f">locationId</td><td><code class="t">string</code> <span class="fk">FK?</span></td><td><span class="opt">○</span></td><td>→ Location.id. Optional link so entries group under a leg.</td></tr>
         <tr><td class="f">type</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">Lodging</span><span class="pill">Transportation</span><span class="pill">Activity</span><span class="pill">Dining</span></td></tr>
-        <tr><td class="f">subType</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>"Activity type" — e.g. Transportation→flight/train/ferry/bus/car; Dining→restaurant/cafe/bar; Activity→hike/tour/museum.</td></tr>
+        <tr><td class="f">subType</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>"Activity type" — Transportation→flight/train/ferry/bus/car; Dining→restaurant/cafe/bar; Activity→hike/tour/museum.</td></tr>
         <tr><td class="f">title</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Display label.</td></tr>
         <tr><td class="f">status</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">considering</span><span class="pill">selected</span><span class="pill">booked</span><span class="pill">no_reservation_needed</span><span class="pill">cancelled</span></td></tr>
         <tr><td class="f">start / end</td><td><code class="t">{dateTime, timeZone}</code></td><td><span class="opt">○</span></td><td>Local time + IANA tz. Departure/check-in = start, arrival/check-out = end (each own tz).</td></tr>
         <tr><td class="f">bookingRef</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Confirmation / booking # (hoisted; primary IDP target).</td></tr>
-        <tr><td class="f">details</td><td><code class="t">object</code></td><td><span class="opt">○</span></td><td>Type-specific non-temporal fields (airline/flightNumber, carrier, provider, address, etc.).</td></tr>
-        <tr><td class="f">notes / links / attachments</td><td>—</td><td><span class="opt">○</span></td><td>Freeform notes; URLs; attachments <b>by reference</b> (path/Drive id).</td></tr>
-        <tr><td class="f">archived</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>"Compare options → archive the losers." Default false.</td></tr>
+        <tr><td class="f">details</td><td><code class="t">object</code></td><td><span class="opt">○</span></td><td>Type-specific non-temporal fields (airline/flightNumber, carrier, provider, address…).</td></tr>
+        <tr><td class="f">notes / links / attachments</td><td>—</td><td><span class="opt">○</span></td><td>Freeform; URLs; attachments <b>by reference</b> (path/Drive id).</td></tr>
+        <tr><td class="f">archived</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>Per-entry option compare within a variant. Default false.</td></tr>
       </tbody>
-      </table></div>
-    </div>
+    </table></div>
   </details></div>
 
-  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">Finance</span> <span class="desc">one per Entry; splits via FinanceMember</span></summary>
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">Finance</span> <span class="desc">one per Entry; splits via FinanceMember</span></summary>
     <div class="body scroll"><table>
       <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
       <tbody>
@@ -290,20 +309,20 @@
     </table></div>
   </details></div>
 
-  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">Member</span> <span class="desc">a person on the trip</span></summary>
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">Member</span> <span class="desc">a person on the trip (trip-level)</span></summary>
     <div class="body">
       <div class="scroll"><table>
       <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td class="f">id</td><td><code class="t">string</code> <span class="pk">PK</span></td><td><span class="req">●</span></td><td>Referenced by junctions.</td></tr>
-        <tr><td class="f">tripId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Trip.id (the Trip–Member link).</td></tr>
+        <tr><td class="f">tripId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Trip.id. People belong to the trip, not a variant.</td></tr>
         <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Display name.</td></tr>
         <tr><td class="f">role</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">Owner</span><span class="pill">Coordinator</span><span class="pill">Participant</span><span class="pill">Follower</span></td></tr>
-        <tr><td class="f">traveling</td><td><code class="t">bool</code></td><td><span class="req">●</span></td><td>Is this person actually on the trip? (Coordinator may plan-only; Follower never travels.)</td></tr>
+        <tr><td class="f">traveling</td><td><code class="t">bool</code></td><td><span class="req">●</span></td><td>Actually on the trip? (Coordinator may plan-only; Follower never travels.)</td></tr>
         <tr><td class="f">contact</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Email/handle for a future invite flow.</td></tr>
       </tbody>
       </table></div>
-      <div class="note"><b>Roles:</b> <b>Owner</b> — creator, full control (traveling). <b>Coordinator</b> — can plan/edit, <i>may not travel</i>. <b>Participant</b> — traveling companion. <b>Follower</b> — watches only, <i>not traveling</i>. <code class="t">traveling</code> defaults from role but is independently editable.</div>
+      <div class="note"><b>Roles:</b> <b>Owner</b> — creator, full control (traveling). <b>Coordinator</b> — can plan/edit, <i>may not travel</i>. <b>Participant</b> — traveling companion. <b>Follower</b> — watches only, <i>not traveling</i>. <code class="t">traveling</code> defaults from role but is editable.</div>
     </div>
   </details></div>
 
@@ -312,22 +331,23 @@
     <div class="scroll"><table class="rel">
       <thead><tr><th>Junction</th><th>Links</th><th>Card.</th><th>Extra fields</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td class="f">Trip–Member</td><td class="f">Trip · Member</td><td class="c">* : *</td><td><code class="t">role</code>, <code class="t">traveling</code></td><td>Who is on the trip and in what capacity. (Held on <span class="ent">Member</span> in Phase 0, since members are trip-scoped.)</td></tr>
-        <tr><td class="f">Location–Member</td><td class="f">Location · Member</td><td class="c">* : *</td><td><code class="t">arrival?</code>, <code class="t">departure?</code></td><td>Which members are at which leg — supports converging trips (people arrive/leave a location on different days).</td></tr>
+        <tr><td class="f">Trip–Member</td><td class="f">Trip · Member</td><td class="c">* : *</td><td><code class="t">role</code>, <code class="t">traveling</code></td><td>Who is on the trip &amp; in what capacity. (Held on <span class="ent">Member</span> in Phase 0, since members are trip-scoped.)</td></tr>
+        <tr><td class="f">Location–Member</td><td class="f">Location · Member</td><td class="c">* : *</td><td><code class="t">arrival?</code>, <code class="t">departure?</code></td><td>Which members are at which leg — supports converging trips (people arrive/leave on different days).</td></tr>
         <tr><td class="f">Finance–Member</td><td class="f">Finance · Member</td><td class="c">* : *</td><td><code class="t">shareAmount</code> / <code class="t">sharePct</code>, <code class="t">isPayee</code>, <code class="t">settled</code></td><td>Bill allocation — split a cost per person, mark who fronted it (payee), track settlement.</td></tr>
       </tbody>
     </table></div>
-    <div class="note"><b>Bill allocation logic (Finance–Member):</b> each <span class="ent">Finance</span> row can be divided among members by explicit amount or percentage (helper: equal split across traveling members). One or more members are flagged <code class="t">isPayee</code> (they paid). "Who owes whom" = each member's <code class="t">shareAmount</code> minus what they paid, netted across the trip. <code class="t">settled</code> marks a share as reconciled.</div>
+    <div class="note"><b>Bill allocation logic (Finance–Member):</b> each <span class="ent">Finance</span> row can be divided among members by explicit amount or percentage (helper: equal split across traveling members). Members flagged <code class="t">isPayee</code> paid it. "Who owes whom" = each member's <code class="t">shareAmount</code> minus what they paid, netted across the trip; <code class="t">settled</code> marks a share reconciled. Only the <b>selected</b> itinerary's allocations are treated as real.</div>
   </div></div>
 
   <h2>Derived values (computed, never stored)</h2>
   <div class="card"><div class="body scroll"><table>
     <thead><tr><th>Value</th><th>From</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td class="f">Trip.start/end</td><td><code class="t">min/max child dates</code></td><td>Rollup of Location (and Entry) dates; manual override wins.</td></tr>
+      <tr><td class="f">Itinerary cost</td><td><code class="t">Σ Finance (its entries)</code></td><td>Estimated / confirmed / paid / unpaid, grouped by currency.</td></tr>
+      <tr><td class="f">Budget variance</td><td><code class="t">Trip.budgetTarget − Itinerary cost</code></td><td>Per itinerary; the compare-variants view.</td></tr>
+      <tr><td class="f">Itinerary.start/end</td><td><code class="t">min/max child dates</code></td><td>Rollup of Location/Entry dates; override wins.</td></tr>
       <tr><td class="f">Finance.unpaidAmount</td><td><code class="t">total − paidAmount</code></td><td>Per entry.</td></tr>
-      <tr><td class="f">Trip budget</td><td><code class="t">Σ Finance</code></td><td>Total estimated / confirmed / paid / unpaid, grouped by currency. No FX in Phase 0.</td></tr>
-      <tr><td class="f">Per-person balance</td><td><code class="t">Σ shareAmount − Σ paid</code></td><td>From Finance–Member; drives settlement.</td></tr>
+      <tr><td class="f">Per-person balance</td><td><code class="t">Σ shareAmount − Σ paid</code></td><td>From Finance–Member (selected itinerary); drives settlement.</td></tr>
       <tr><td class="f">Location overlap</td><td><code class="t">date-range intersection</code></td><td>≥2 days &amp; not <code class="t">overlapCleared</code> → warning.</td></tr>
     </tbody>
   </table></div></div>
@@ -335,16 +355,16 @@
   <h2>Open modeling decisions (refine here)</h2>
   <div class="card"><div class="body">
     <ul class="dec">
-      <li><b>Itinerary : Trip</b> — one itinerary holds many trips, or exactly one in Phase 0? <span class="rec">Rec: 1 : many, but Phase 0 authors one trip per file.</span></li>
-      <li><b>Entry → Location</b> optional FK (entries group under a leg) vs. entries only under Trip. <span class="rec">Rec: optional FK.</span></li>
-      <li><b>Personal vs. shared entries</b> — express "this is Effie's flight" via Location–Member (leg membership) + Finance–Member (who pays), or add a direct Entry–Member link? <span class="rec">Rec: leg + finance links; add Entry–Member only if needed.</span></li>
-      <li><b>Allocation input</b> — explicit <code class="t">shareAmount</code> vs. <code class="t">sharePct</code> vs. equal-split helper. <span class="rec">Rec: store amounts; offer equal-split + percentage as helpers.</span></li>
-      <li><b>subType</b> ("Activity Type") — free text vs. controlled enum per <code class="t">type</code>. <span class="rec">Rec: controlled list per type, with an "other" escape.</span></li>
-      <li><b>Overlap threshold</b> — fixed at ≥2 days, or configurable? <span class="rec">Rec: fixed at 2 for Phase 0.</span></li>
+      <li><b>One <code class="t">selected</code> itinerary</b> at a time (others draft/archived); allocations count only for it. <span class="rec">Rec: yes.</span></li>
+      <li><b>Budget granularity</b> — single trip target vs. per-category (lodging/transport/…). <span class="rec">Rec: single target in Phase 0; per-category later.</span></li>
+      <li><b>Dates</b> — rollup at itinerary level + optional trip target window. <span class="rec">Rec: yes.</span></li>
+      <li><b>Members are trip-level</b> and shared across all itineraries. <span class="rec">Rec: yes.</span></li>
+      <li><b>Personal vs. shared entries</b> — express via Location–Member + Finance–Member, or a direct Entry–Member link? <span class="rec">Rec: leg + finance links; add Entry–Member only if needed.</span></li>
+      <li><b>subType</b> — controlled enum per <code class="t">type</code> vs. free text. <span class="rec">Rec: controlled list per type, with "other".</span></li>
     </ul>
   </div></div>
 
-  <footer>Trip Planner · Phase 0 · data model draft for review — schemaVersion 0.2.0</footer>
+  <footer>Trip Planner · Phase 0 · data model draft for review — schemaVersion 0.3.0</footer>
 </div>
 </body>
 </html>
