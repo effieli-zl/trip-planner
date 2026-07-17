@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trip Planner — Phase 0 Data Model</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d21; --muted:#657084;
+    --border:#e2e6ec; --accent:#2f6feb; --accent-soft:#eaf1ff;
+    --chip:#eef1f5; --chip-ink:#39424f; --req:#d9480f; --mono:#0b7285;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0f1115; --card:#161a21; --ink:#e7e9ee; --muted:#9aa4b3;
+      --border:#272d38; --accent:#6ea8fe; --accent-soft:#18233b;
+      --chip:#1e242e; --chip-ink:#c3cad6; --req:#ff9e6b; --mono:#5ec2d8;
+      --shadow:none;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1115; --card:#161a21; --ink:#e7e9ee; --muted:#9aa4b3;
+    --border:#272d38; --accent:#6ea8fe; --accent-soft:#18233b;
+    --chip:#1e242e; --chip-ink:#c3cad6; --req:#ff9e6b; --mono:#5ec2d8; --shadow:none;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d21; --muted:#657084;
+    --border:#e2e6ec; --accent:#2f6feb; --accent-soft:#eaf1ff;
+    --chip:#eef1f5; --chip-ink:#39424f; --req:#d9480f; --mono:#0b7285; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 20px 80px;}
+  header.doc{margin-bottom:8px;}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em;}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 2px;}
+  .ver{display:inline-block;margin-top:10px;font-size:12px;color:var(--accent);
+    background:var(--accent-soft);border:1px solid var(--border);padding:3px 9px;border-radius:20px;}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    margin:34px 0 12px;font-weight:600;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);margin:12px 0;overflow:hidden;}
+  details>summary{cursor:pointer;list-style:none;padding:14px 18px;display:flex;
+    align-items:center;gap:10px;font-weight:600;font-size:15.5px;}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary .chev{transition:transform .15s ease;color:var(--muted);font-size:12px}
+  details[open]>summary .chev{transform:rotate(90deg)}
+  .ent{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    color:var(--mono);font-size:14px}
+  summary .desc{font-weight:400;color:var(--muted);font-size:13px;margin-left:auto;text-align:right}
+  .body{padding:2px 18px 16px;}
+  .scroll{overflow-x:auto;}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;}
+  tr:last-child td{border-bottom:none}
+  td.f{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;font-weight:600}
+  code.t{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--chip);
+    color:var(--chip-ink);padding:1px 6px;border-radius:5px;font-size:12.5px;white-space:nowrap}
+  .req{color:var(--req);font-weight:700}
+  .opt{color:var(--muted)}
+  .pill{display:inline-block;background:var(--chip);color:var(--chip-ink);border-radius:5px;
+    padding:1px 6px;margin:1px 3px 1px 0;font-size:12px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .lead{color:var(--muted);font-size:13.5px;margin:0 0 10px}
+  .diagram{width:100%;height:auto;display:block}
+  .note{background:var(--accent-soft);border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;font-size:13.5px;margin:10px 0}
+  .rel td.c{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;color:var(--accent)}
+  ul.dec{margin:0;padding-left:18px}
+  ul.dec li{margin:7px 0}
+  .rec{color:var(--accent);font-weight:600}
+  footer{color:var(--muted);font-size:12px;margin-top:40px;text-align:center}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="doc">
+    <h1>Trip Planner — Phase 0 Data Model</h1>
+    <p class="sub">The itinerary is the single source of truth. One uniform <span class="ent">entry</span> record; booking status drives what the UI reveals — not the schema.</p>
+    <p class="sub">Standalone, file-backed (<code class="t">trips/&lt;slug&gt;/itinerary.json</code>), validated against a versioned JSON Schema. Durable contract a future app/connector can consume.</p>
+    <span class="ver">schemaVersion 0.1.0 · draft for review</span>
+  </header>
+
+  <h2>Structure &amp; relationships</h2>
+  <div class="card"><div class="body">
+    <p class="lead">Composition (◆ embedded object) and reference (↝) relationships. Everything hangs off the trip; the entry embeds its detail objects.</p>
+    <div class="scroll">
+      <svg class="diagram" viewBox="0 0 860 470" width="860" role="img" aria-label="Data model relationship diagram">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+        <style>
+          .box{fill:var(--card);stroke:var(--border);stroke-width:1.5}
+          .boxAccent{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5}
+          .lbl{fill:var(--ink);font:600 13px ui-monospace,Menlo,monospace}
+          .sm{fill:var(--muted);font:11px -apple-system,Segoe UI,Roboto,sans-serif}
+          .ln{stroke:var(--muted);stroke-width:1.4;fill:none}
+          .card-txt{fill:var(--accent);font:700 12px ui-monospace,Menlo,monospace}
+        </style>
+        <!-- root -->
+        <rect class="boxAccent" x="330" y="16" width="200" height="46" rx="9"/>
+        <text class="lbl" x="430" y="38" text-anchor="middle">itinerary.json</text>
+        <text class="sm" x="430" y="53" text-anchor="middle">root · schemaVersion</text>
+        <!-- trip / entries -->
+        <rect class="boxAccent" x="150" y="112" width="170" height="46" rx="9"/>
+        <text class="lbl" x="235" y="134" text-anchor="middle">trip</text>
+        <text class="sm" x="235" y="149" text-anchor="middle">metadata</text>
+        <rect class="boxAccent" x="540" y="112" width="180" height="46" rx="9"/>
+        <text class="lbl" x="630" y="134" text-anchor="middle">entries[ ]</text>
+        <text class="sm" x="630" y="149" text-anchor="middle">entry (uniform record)</text>
+        <!-- contributor -->
+        <rect class="box" x="120" y="212" width="160" height="42" rx="9"/>
+        <text class="lbl" x="200" y="238" text-anchor="middle">contributor[ ]</text>
+        <!-- embedded of entry, row 1 -->
+        <rect class="box" x="410" y="212" width="120" height="40" rx="9"/>
+        <text class="lbl" x="470" y="237" text-anchor="middle">start / end</text>
+        <rect class="box" x="545" y="212" width="120" height="40" rx="9"/>
+        <text class="lbl" x="605" y="237" text-anchor="middle">location</text>
+        <rect class="box" x="680" y="212" width="120" height="40" rx="9"/>
+        <text class="lbl" x="740" y="237" text-anchor="middle">ownership</text>
+        <!-- embedded of entry, row 2 -->
+        <rect class="box" x="475" y="286" width="120" height="40" rx="9"/>
+        <text class="lbl" x="535" y="311" text-anchor="middle">price</text>
+        <rect class="box" x="615" y="286" width="140" height="40" rx="9"/>
+        <text class="lbl" x="685" y="311" text-anchor="middle">typeFields</text>
+        <!-- lines root->trip / root->entries -->
+        <path class="ln" marker-end="url(#arrow)" d="M390,62 C330,85 290,90 260,110"/>
+        <path class="ln" marker-end="url(#arrow)" d="M470,62 C540,85 590,90 620,110"/>
+        <text class="card-txt" x="300" y="92">1 ◆ 1</text>
+        <text class="card-txt" x="545" y="92">1 ◆ *</text>
+        <!-- trip -> contributor -->
+        <path class="ln" marker-end="url(#arrow)" d="M225,158 C215,180 210,190 205,210"/>
+        <text class="card-txt" x="150" y="190">1 ◆ *</text>
+        <!-- entries -> embedded -->
+        <path class="ln" marker-end="url(#arrow)" d="M600,158 C540,180 500,192 475,210"/>
+        <path class="ln" marker-end="url(#arrow)" d="M628,158 C620,180 612,192 606,210"/>
+        <path class="ln" marker-end="url(#arrow)" d="M660,158 C700,180 720,192 738,210"/>
+        <path class="ln" marker-end="url(#arrow)" d="M620,158 C580,200 560,250 545,285"/>
+        <path class="ln" marker-end="url(#arrow)" d="M650,158 C670,210 682,250 686,285"/>
+        <!-- ownership ↝ contributor (reference) -->
+        <path class="ln" stroke-dasharray="4 4" marker-end="url(#arrow)" d="M740,252 C700,340 360,330 210,256"/>
+        <text class="card-txt" x="430" y="345">↝ ownership.contributorId → contributor.id</text>
+      </svg>
+    </div>
+    <div class="note"><b>Reading it:</b> <code class="t">◆</code> = composition (object lives inside its parent). <code class="t">↝</code> = reference by id. An entry embeds all of its detail objects (times, place, ownership, price, type fields); the only cross-reference is a personal entry's <code class="t">ownership.contributorId</code> pointing at a <code class="t">trip.contributors[]</code> member.</div>
+
+    <div class="scroll">
+      <table class="rel">
+        <thead><tr><th>From</th><th>To</th><th>Kind</th><th>Card.</th><th>Via / notes</th></tr></thead>
+        <tbody>
+          <tr><td class="f">itinerary.json</td><td class="f">trip</td><td>compose</td><td class="c">1 → 1</td><td>Root holds one trip.</td></tr>
+          <tr><td class="f">itinerary.json</td><td class="f">entries[]</td><td>compose</td><td class="c">1 → *</td><td>Ordered list of entries.</td></tr>
+          <tr><td class="f">trip</td><td class="f">contributors[]</td><td>compose</td><td class="c">1 → *</td><td>People on the trip.</td></tr>
+          <tr><td class="f">entry</td><td class="f">start / end</td><td>compose</td><td class="c">1 → 0..1</td><td>Canonical times; null when untimed.</td></tr>
+          <tr><td class="f">entry</td><td class="f">location</td><td>compose</td><td class="c">1 → 0..1</td><td>Single-place types.</td></tr>
+          <tr><td class="f">entry</td><td class="f">ownership</td><td>compose</td><td class="c">1 → 1</td><td>shared or personal.</td></tr>
+          <tr><td class="f">entry</td><td class="f">price</td><td>compose</td><td class="c">1 → 0..1</td><td>Money block.</td></tr>
+          <tr><td class="f">entry</td><td class="f">typeFields</td><td>compose</td><td class="c">1 → 1</td><td>Shape depends on <code class="t">entry.type</code>.</td></tr>
+          <tr><td class="f">entry.ownership</td><td class="f">contributor</td><td>reference</td><td class="c">0..1 ↝ 1</td><td>Only for personal entries.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div></div>
+
+  <h2>Entities &amp; column definitions</h2>
+  <p class="lead"><span class="req">●</span> required · <span class="opt">○</span> optional. Types shown as JSON types; enums listed inline.</p>
+
+  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">itinerary.json</span> <span class="desc">root object</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">schemaVersion</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Semver of the model contract, e.g. <code class="t">"0.1.0"</code>. Enables safe migration by a future app/connector.</td></tr>
+        <tr><td class="f">trip</td><td><code class="t">object</code></td><td><span class="req">●</span></td><td>Trip metadata (see below).</td></tr>
+        <tr><td class="f">entries</td><td><code class="t">entry[]</code></td><td><span class="req">●</span></td><td>Itinerary entries, in display order.</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">trip</span> <span class="desc">trip-level metadata</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">id</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Stable id / slug.</td></tr>
+        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Trip name.</td></tr>
+        <tr><td class="f">destinations</td><td><code class="t">{name, country?}[]</code></td><td><span class="req">●</span></td><td>One or more destinations.</td></tr>
+        <tr><td class="f">startDate</td><td><code class="t">date</code></td><td><span class="req">●</span></td><td>ISO date. Day index derives from this.</td></tr>
+        <tr><td class="f">endDate</td><td><code class="t">date</code></td><td><span class="req">●</span></td><td>ISO date.</td></tr>
+        <tr><td class="f">baseCurrency</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>ISO 4217, e.g. <code class="t">USD</code>. Default for entry currency.</td></tr>
+        <tr><td class="f">contributors</td><td><code class="t">contributor[]</code></td><td><span class="req">●</span></td><td>People on the trip (≥1). Powers shared/personal attribution.</td></tr>
+        <tr><td class="f">visibility</td><td><code class="t">enum</code></td><td><span class="opt">○</span></td><td><span class="pill">private</span><span class="pill">friends</span><span class="pill">public</span> — <b>recorded, not enforced</b> (forward-looking). Default <code class="t">private</code>.</td></tr>
+        <tr><td class="f">coverPhoto</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Reference to an image.</td></tr>
+        <tr><td class="f">notes</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Freeform trip notes.</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">contributor</span> <span class="desc">member of trip.contributors[]</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">id</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Referenced by <code class="t">ownership.contributorId</code>.</td></tr>
+        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Display name.</td></tr>
+        <tr><td class="f">isOwner</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>Trip creator flag. Default false.</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details open><summary><span class="chev">▶</span><span class="ent">entry</span> <span class="desc">the uniform itinerary record</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">id</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Stable id.</td></tr>
+        <tr><td class="f">type</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">accommodation</span><span class="pill">flight</span><span class="pill">train_ferry_bus</span><span class="pill">car_transfer</span><span class="pill">activity</span><span class="pill">restaurant</span><span class="pill">free_time</span><span class="pill">custom</span></td></tr>
+        <tr><td class="f">title</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Display label.</td></tr>
+        <tr><td class="f">status</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">considering</span><span class="pill">selected</span><span class="pill">booked</span><span class="pill">no_reservation_needed</span><span class="pill">cancelled</span> — drives UI reveal.</td></tr>
+        <tr><td class="f">date</td><td><code class="t">date</code></td><td><span class="req">●</span></td><td>Calendar day the entry sits on; day index derived from <code class="t">trip.startDate</code>.</td></tr>
+        <tr><td class="f">start</td><td><code class="t">timePoint</code></td><td><span class="opt">○</span></td><td>Canonical start (departure/check-in). Null = untimed.</td></tr>
+        <tr><td class="f">end</td><td><code class="t">timePoint</code></td><td><span class="opt">○</span></td><td>Canonical end (arrival/check-out).</td></tr>
+        <tr><td class="f">location</td><td><code class="t">location</code></td><td><span class="opt">○</span></td><td>Single-place types. Transport endpoints live in <code class="t">typeFields</code>.</td></tr>
+        <tr><td class="f">ownership</td><td><code class="t">ownership</code></td><td><span class="req">●</span></td><td>shared vs personal + attribution.</td></tr>
+        <tr><td class="f">bookingRef</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td><b>Hoisted</b> confirmation / booking #. Cross-cutting; primary IDP target.</td></tr>
+        <tr><td class="f">price</td><td><code class="t">price</code></td><td><span class="opt">○</span></td><td>Money block.</td></tr>
+        <tr><td class="f">typeFields</td><td><code class="t">object</code></td><td><span class="req">●</span></td><td>Per-<code class="t">type</code> non-temporal fields (may be empty for free_time).</td></tr>
+        <tr><td class="f">notes</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Freeform.</td></tr>
+        <tr><td class="f">links</td><td><code class="t">{label?, url}[]</code></td><td><span class="opt">○</span></td><td>Related URLs.</td></tr>
+        <tr><td class="f">attachments</td><td><code class="t">attachment[]</code></td><td><span class="opt">○</span></td><td><b>Reference only</b> (path / Drive id); no binaries committed.</td></tr>
+        <tr><td class="f">archived</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>Default false. "Compare options → archive the losers" (no special structure).</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">timePoint</span> <span class="desc">entry.start / entry.end</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">dateTime</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Local ISO 8601 <b>without</b> offset, e.g. <code class="t">2026-11-02T09:15</code>.</td></tr>
+        <tr><td class="f">timeZone</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>IANA tz, e.g. <code class="t">America/Argentina/Ushuaia</code>. Each end can differ (flights).</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">location</span> <span class="desc">entry.location</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Place name.</td></tr>
+        <tr><td class="f">address</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Full address.</td></tr>
+        <tr><td class="f">lat</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>For a future map view (PRD F2).</td></tr>
+        <tr><td class="f">lng</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>For a future map view (PRD F2).</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">ownership</span> <span class="desc">entry.ownership</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">scope</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">shared</span><span class="pill">personal</span>. Shared = the main timeline; personal = one contributor's own item (e.g. their flight to the meet-up).</td></tr>
+        <tr><td class="f">contributorId</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Required when <code class="t">scope=personal</code>; ↝ <code class="t">contributor.id</code>.</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">price</span> <span class="desc">entry.price</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">totalAmount</td><td><code class="t">number</code></td><td><span class="req">●</span></td><td>Full price of the entry.</td></tr>
+        <tr><td class="f">amountKind</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">confirmed</span><span class="pill">estimate</span> — is the price locked in or approximate?</td></tr>
+        <tr><td class="f">paidAmount</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>Amount actually paid (deposits/partial). Default 0.</td></tr>
+        <tr><td class="f">currency</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>ISO 4217. Defaults to <code class="t">trip.baseCurrency</code>. No auto-FX in Phase 0.</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">typeFields</span> <span class="desc">shape depends on entry.type</span></summary>
+    <div class="body">
+      <p class="lead">Non-temporal, type-specific fields. Times are always in <code class="t">start</code>/<code class="t">end</code>; confirmation numbers in <code class="t">bookingRef</code>; money in <code class="t">price</code>.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>type</th><th>Fields</th></tr></thead>
+        <tbody>
+          <tr><td class="f">accommodation</td><td><span class="pill">address?</span><span class="pill">roomType?</span> <span class="opt">(name→title/location; check-in/out→start/end)</span></td></tr>
+          <tr><td class="f">flight</td><td><span class="pill">airline</span><span class="pill">flightNumber</span><span class="pill">departureAirport</span><span class="pill">arrivalAirport</span><span class="pill">seat?</span><span class="pill">cabin?</span></td></tr>
+          <tr><td class="f">train_ferry_bus</td><td><span class="pill">carrier</span><span class="pill">mode: train|ferry|bus</span><span class="pill">fromStation</span><span class="pill">toStation</span></td></tr>
+          <tr><td class="f">car_transfer</td><td><span class="pill">provider</span><span class="pill">pickupLocation</span><span class="pill">dropoffLocation</span><span class="pill">vehicle?</span></td></tr>
+          <tr><td class="f">activity</td><td><span class="pill">bookingRequired: bool</span><span class="pill">durationMinutes?</span></td></tr>
+          <tr><td class="f">restaurant</td><td><span class="pill">reservationRequired: bool</span><span class="pill">estimatedCostPerPerson?</span></td></tr>
+          <tr><td class="f">free_time</td><td><span class="opt">{ } — title + optional time block + notes only</span></td></tr>
+          <tr><td class="f">custom</td><td><span class="pill">label</span><span class="pill">fields: {}</span> <span class="opt">freeform</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details></div>
+
+  <div class="card"><details><summary><span class="chev">▶</span><span class="ent">attachment</span> <span class="desc">entry.attachments[]</span></summary>
+    <div class="body scroll"><table>
+      <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Display name of the file.</td></tr>
+        <tr><td class="f">ref</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Local path or Drive id — <b>reference only</b>.</td></tr>
+        <tr><td class="f">kind</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>e.g. pdf, image, email.</td></tr>
+      </tbody>
+    </table></div>
+  </details></div>
+
+  <h2>Derived (computed, never stored)</h2>
+  <div class="card"><div class="body scroll"><table>
+    <thead><tr><th>Value</th><th>From</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="f">day index</td><td><code class="t">entry.date − trip.startDate</code></td><td>1-based day number for grouping.</td></tr>
+      <tr><td class="f">budget summary</td><td><code class="t">Σ entry.price</code></td><td>Total estimated / confirmed / paid, grouped by currency. No FX conversion in Phase 0.</td></tr>
+    </tbody>
+  </table></div></div>
+
+  <h2>Open modeling decisions (refine here)</h2>
+  <div class="card"><div class="body">
+    <ul class="dec">
+      <li><b>bookingRef hoisted</b> to entry level vs. per-type. <span class="rec">Rec: hoisted</span> — cross-cutting, main IDP target.</li>
+      <li><b>date as day anchor</b>, day-index derived, vs. explicit integer <code class="t">day</code>. <span class="rec">Rec: date</span>.</li>
+      <li><b>Times canonical in start/end</b>; typeFields non-temporal — removes duplication. <span class="rec">Rec: yes</span>.</li>
+      <li><b>Multi-currency</b>: store native, no auto-conversion in Phase 0. <span class="rec">Rec: yes</span>.</li>
+      <li><b>Attachments reference-only</b> (no binaries committed). <span class="rec">Rec: yes</span>.</li>
+      <li><b>Compare-options</b> via sibling entries + <code class="t">archived</code>, no special structure. <span class="rec">Rec: yes</span>.</li>
+    </ul>
+  </div></div>
+
+  <footer>Trip Planner · Phase 0 · data model draft for review — schemaVersion 0.1.0</footer>
+</div>
+</body>
+</html>
