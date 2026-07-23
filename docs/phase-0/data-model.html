@@ -93,7 +93,7 @@
     <h1>Trip Planner — Phase 0 Data Model</h1>
     <p class="sub">A <span class="ent">Trip</span> is the wrapper — it owns the <b>budget</b> and the <b>people</b>. It contains one or more <span class="ent">Itineraries</span> (plan variants) you draft and compare during planning; each itinerary's cost rolls up and is measured against the trip budget. The <i>primary</i> itinerary is the source of truth for the actual trip; members are inherited from the trip into each variant and adjustable per variant.</p>
     <p class="sub">Standalone, file-backed (<code class="t">trips/&lt;slug&gt;/trip.json</code>), validated against a versioned schema. A durable contract a future app/connector can consume.</p>
-    <span class="ver">schemaVersion 0.4.0 · draft for review</span>
+    <span class="ver">schemaVersion 0.5.0 · draft for review</span>
   </header>
 
   <h2>Hierarchy (containment)</h2>
@@ -277,6 +277,7 @@
         <tr><td class="f">itineraryId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Itinerary.id.</td></tr>
         <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>e.g. "Buenos Aires".</td></tr>
         <tr><td class="f">startDate / endDate</td><td><code class="t">date</code></td><td><span class="req">●</span></td><td>Arrive / leave.</td></tr>
+        <tr><td class="f">sortIndex</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>Leg order for kanban columns &amp; map route. Defaults to <code class="t">startDate</code> order.</td></tr>
         <tr><td class="f">overlapCleared</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>User dismissed the overlap warning. Default false.</td></tr>
         <tr><td class="f">lat / lng</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>For a future map view.</td></tr>
       </tbody>
@@ -296,10 +297,13 @@
         <tr><td class="f">subType</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>"Activity type" — Transportation→flight/train/ferry/bus/car; Dining→restaurant/cafe/bar; Activity→hike/tour/museum.</td></tr>
         <tr><td class="f">title</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Display label.</td></tr>
         <tr><td class="f">status</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">considering</span><span class="pill">selected</span><span class="pill">booked</span><span class="pill">no_reservation_needed</span><span class="pill">cancelled</span></td></tr>
+        <tr><td class="f">date</td><td><code class="t">date</code></td><td><span class="opt">○</span></td><td>Day anchor for the time view; undated entries fall into an "Unscheduled" bucket. Matches <code class="t">start</code>'s local date when timed.</td></tr>
         <tr><td class="f">start / end</td><td><code class="t">{dateTime, timeZone}</code></td><td><span class="opt">○</span></td><td>Local time + IANA tz. Departure/check-in = start, arrival/check-out = end (each own tz).</td></tr>
+        <tr><td class="f">place</td><td><code class="t">{name?, address?, lat?, lng?}</code></td><td><span class="opt">○</span></td><td>The entry's precise point — address for display, lat/lng for map pins. Distinct from <span class="ent">Location</span> (the dated leg).</td></tr>
         <tr><td class="f">bookingRef</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Confirmation / booking # (hoisted; primary IDP target).</td></tr>
-        <tr><td class="f">details</td><td><code class="t">object</code></td><td><span class="opt">○</span></td><td>Type-specific non-temporal fields (airline/flightNumber, carrier, provider, address…).</td></tr>
+        <tr><td class="f">details</td><td><code class="t">object</code></td><td><span class="opt">○</span></td><td>Type-specific non-temporal fields (airline/flightNumber, carrier, provider, seat, cabin…). Geo/address live on <code class="t">place</code>.</td></tr>
         <tr><td class="f">notes / links / attachments</td><td>—</td><td><span class="opt">○</span></td><td>Freeform; URLs; attachments <b>by reference</b> (path/Drive id).</td></tr>
+        <tr><td class="f">sortIndex</td><td><code class="t">number</code></td><td><span class="opt">○</span></td><td>Manual order within its day / column (drag-drop). Falls back to start time, then insertion order.</td></tr>
         <tr><td class="f">archived</td><td><code class="t">bool</code></td><td><span class="opt">○</span></td><td>Per-entry option compare within a variant. Default false.</td></tr>
       </tbody>
     </table></div>
@@ -351,6 +355,20 @@
     <div class="note"><b>Bill allocation logic (Finance–Member):</b> each <span class="ent">Finance</span> row can be divided among members by explicit amount or percentage (helper: equal split across traveling members). Members flagged <code class="t">isPayee</code> paid it. "Who owes whom" = each member's <code class="t">shareAmount</code> minus what they paid, netted across the trip; <code class="t">settled</code> marks a share reconciled. Splits use the variant's <span class="ent">ItineraryMember</span> roster; only the <b>primary</b> itinerary's allocations are treated as real.</div>
   </div></div>
 
+  <h2>Views the model feeds</h2>
+  <div class="card"><div class="body">
+    <p class="lead">The same entities render as switchable views — the schema carries the grouping, ordering, and geo keys each needs. Phase 0 exports static versions; interactive drag-drop, the kanban board, and the live map are the app's job.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>View</th><th>Grouping</th><th>Ordering</th><th>Key fields</th></tr></thead>
+      <tbody>
+        <tr><td><b>Time-based</b> (hierarchical)</td><td>Itinerary → Day → Entry (undated → "Unscheduled")</td><td>start time, else <code class="t">sortIndex</code></td><td><code class="t">Entry.date</code>, <code class="t">start/end</code>, <code class="t">sortIndex</code></td></tr>
+        <tr><td><b>Location board</b> (kanban)</td><td>Columns = Locations; cards = Entries (+ "Unassigned")</td><td>columns by <code class="t">Location.sortIndex</code>; cards by <code class="t">Entry.sortIndex</code></td><td><code class="t">Entry.locationId</code>, <code class="t">Location.sortIndex</code>, <code class="t">Entry.sortIndex</code></td></tr>
+        <tr><td><b>Map</b> (interactive)</td><td>Pins per Entry <code class="t">place</code> / Location; route between legs</td><td>legs by <code class="t">Location.sortIndex</code> (else <code class="t">startDate</code>)</td><td><code class="t">Entry.place.lat/lng</code>, <code class="t">Location.lat/lng</code>, <code class="t">Location.sortIndex</code></td></tr>
+      </tbody>
+    </table></div>
+    <div class="note"><b>Views stay in sync because they're projections of one dataset.</b> Interaction just rewrites fields: reordering sets <code class="t">sortIndex</code>; dragging a card to another column sets <code class="t">locationId</code>; moving a pin edits <code class="t">place</code>. Coordinates are stored provider-agnostic (lat/lng), so the map provider (Mapbox/Google — a PRD open item) stays a rendering choice.</div>
+  </div></div>
+
   <h2>Derived values (computed, never stored)</h2>
   <div class="card"><div class="body scroll"><table>
     <thead><tr><th>Value</th><th>From</th><th>Notes</th></tr></thead>
@@ -373,10 +391,12 @@
       <li><b>Personal vs. shared entries</b> — express via Itinerary/Location–Member + Finance–Member, or a direct Entry–Member link? <span class="rec">Rec: membership + finance links; add Entry–Member only if needed.</span></li>
       <li><b>subType</b> — controlled enum per <code class="t">type</code> vs. free text. <span class="rec">Rec: controlled list per type, with "other".</span></li>
       <li><b>Allocation input</b> — explicit <code class="t">shareAmount</code> vs. <code class="t">sharePct</code> vs. equal-split helper. <span class="rec">Rec: store amounts; offer equal-split + % helpers.</span></li>
+      <li><b>Ordering</b> — one <code class="t">sortIndex</code> shared across views vs. a separate order per view. <span class="rec">Rec: single <code class="t">sortIndex</code> in Phase 0; per-view order later if needed.</span></li>
+      <li><b>Map pins</b> — entry-level <code class="t">place</code> for precise pins, with <code class="t">Location</code> coords as the leg fallback. <span class="rec">Rec: yes.</span></li>
     </ul>
   </div></div>
 
-  <footer>Trip Planner · Phase 0 · data model draft for review — schemaVersion 0.4.0</footer>
+  <footer>Trip Planner · Phase 0 · data model draft for review — schemaVersion 0.5.0</footer>
 </div>
 </body>
 </html>
