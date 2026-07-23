@@ -91,9 +91,9 @@
 <div class="wrap">
   <header>
     <h1>Trip Planner — Phase 0 Data Model</h1>
-    <p class="sub">A <span class="ent">Trip</span> is the wrapper — it owns the <b>budget</b> and the <b>people</b>. It contains one or more <span class="ent">Itineraries</span> (plan variants) you draft and compare during planning; each itinerary's cost rolls up and is measured against the trip budget. The <i>selected</i> itinerary is the source of truth for the actual trip.</p>
+    <p class="sub">A <span class="ent">Trip</span> is the wrapper — it owns the <b>budget</b> and the <b>people</b>. It contains one or more <span class="ent">Itineraries</span> (plan variants) you draft and compare during planning; each itinerary's cost rolls up and is measured against the trip budget. The <i>primary</i> itinerary is the source of truth for the actual trip; members are inherited from the trip into each variant and adjustable per variant.</p>
     <p class="sub">Standalone, file-backed (<code class="t">trips/&lt;slug&gt;/trip.json</code>), validated against a versioned schema. A durable contract a future app/connector can consume.</p>
-    <span class="ver">schemaVersion 0.3.0 · draft for review</span>
+    <span class="ver">schemaVersion 0.4.0 · draft for review</span>
   </header>
 
   <h2>Hierarchy (containment)</h2>
@@ -101,7 +101,7 @@
     <p class="lead">Parent → child ownership. Budget and Members sit on the Trip; plan detail lives inside each Itinerary variant.</p>
     <div class="tree">
       <div class="node l0"><div class="row"><span class="tname">Trip</span> <span class="tmeta">— wrapper · id, name, <b>budget target</b>, base currency, people</span></div>
-        <div class="node"><div class="row"><span class="tname">Itinerary</span> <span class="badge">1 : many</span> <span class="tmeta">— a plan variant · status: draft · selected · archived; dates <b>(rollup)</b>; cost compared to trip budget</span></div>
+        <div class="node"><div class="row"><span class="tname">Itinerary</span> <span class="badge">1 : many</span> <span class="tmeta">— a plan variant · status: draft · primary · archived; members inherited (adjustable); dates <b>(rollup)</b>; cost compared to trip budget</span></div>
           <div class="node"><div class="row"><span class="tname">Location</span> <span class="tmeta">— start/end date · <b>overlap warning</b> when 2 locations overlap ≥2 days (dismissible)</span></div></div>
           <div class="node"><div class="row"><span class="tname">Entry</span> <span class="tmeta">— type: Lodging · Transportation · Activity · Dining; subtype, start/end date-time</span></div>
             <div class="node"><div class="row"><span class="tname">Finance</span> <span class="tmeta">— total, estimate⇄confirmed, paid, unpaid (derived)</span></div></div>
@@ -147,6 +147,12 @@
         <!-- Trip -> Member : 1..* -->
         <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M600,120 L600,150 L850,150 L850,188"/>
         <text class="card2" x="700" y="143">1 : *</text>
+        <!-- Itinerary -> ItineraryMember : 1..* -->
+        <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M430,221 L488,221"/>
+        <text class="card2" x="440" y="213">1 : *</text>
+        <!-- ItineraryMember -> Member : *..1 -->
+        <path class="ln2" marker-start="url(#crow)" marker-end="url(#bar)" d="M680,221 L760,221"/>
+        <text class="card2" x="700" y="213">* : 1</text>
         <!-- Itinerary -> Location : 1..* -->
         <path class="ln2" marker-start="url(#bar)" marker-end="url(#crow)" d="M300,273 L160,273 L160,378"/>
         <text class="card2" x="168" y="330">1 : *</text>
@@ -190,6 +196,11 @@
           <text class="etitle" x="772" y="207">Member</text>
           <text class="ef" x="772" y="232">id <tspan class="kk">PK</tspan></text>
           <text class="ef" x="772" y="251">tripId <tspan class="kk">FK</tspan></text></g>
+        <!-- ItineraryMember (junction) -->
+        <g class="jt"><rect class="eb" x="488" y="182" width="192" height="78" rx="8"/><rect class="eh" x="488" y="182" width="192" height="24" rx="8"/><line class="sep" x1="488" y1="206" x2="680" y2="206"/>
+          <text class="etitle" x="500" y="199">ItineraryMember</text>
+          <text class="ef" x="500" y="224">itineraryId <tspan class="kk">FK</tspan></text>
+          <text class="ef" x="500" y="243">memberId <tspan class="kk">FK</tspan></text></g>
         <!-- Location -->
         <g><rect class="eb" x="70" y="380" width="180" height="78" rx="8"/><rect class="eh" x="70" y="380" width="180" height="24" rx="8"/><line class="sep" x1="70" y1="404" x2="250" y2="404"/>
           <text class="etitle" x="82" y="397">Location</text>
@@ -217,7 +228,7 @@
           <text class="ef" x="608" y="601">memberId <tspan class="kk">FK</tspan></text></g>
       </svg>
     </div>
-    <div class="note"><b>Why the split:</b> Trip holds the <b>budget</b> and the <b>people</b>; each <span class="ent">Itinerary</span> is a self-contained plan variant whose cost (Σ Finance) is compared against the trip budget. <span class="ent">LocationMember</span> and <span class="ent">FinanceMember</span> divide legs and costs across trip members without duplicating entries.</div>
+    <div class="note"><b>Why the split:</b> Trip holds the <b>budget</b> and the <b>people</b>; each <span class="ent">Itinerary</span> is a self-contained plan variant (duplicate entries across variants are expected during planning) whose cost (Σ Finance) is compared against the trip budget. <span class="ent">ItineraryMember</span> sets the per-variant group (inherited from the trip, adjustable); <span class="ent">LocationMember</span> and <span class="ent">FinanceMember</span> divide legs and costs among them.</div>
   </div></div>
 
   <h2>Entities &amp; column definitions</h2>
@@ -247,13 +258,13 @@
         <tr><td class="f">id</td><td><code class="t">string</code> <span class="pk">PK</span></td><td><span class="req">●</span></td><td>Stable id.</td></tr>
         <tr><td class="f">tripId</td><td><code class="t">string</code> <span class="fk">FK</span></td><td><span class="req">●</span></td><td>→ Trip.id.</td></tr>
         <tr><td class="f">name</td><td><code class="t">string</code></td><td><span class="req">●</span></td><td>Label, e.g. "Plan A — beach-heavy".</td></tr>
-        <tr><td class="f">status</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">draft</span><span class="pill">selected</span><span class="pill">archived</span> — one <code class="t">selected</code> is the live plan; costs/allocations count for it.</td></tr>
+        <tr><td class="f">status</td><td><code class="t">enum</code></td><td><span class="req">●</span></td><td><span class="pill">draft</span><span class="pill">primary</span><span class="pill">archived</span> — exactly one <code class="t">primary</code> is the live plan used for the actual trip; costs/allocations count for it.</td></tr>
         <tr><td class="f">startDate</td><td><code class="t">date</code> <span class="drv">⟲</span></td><td><span class="opt">○</span></td><td><b>Rollup:</b> earliest child date. Override allowed.</td></tr>
         <tr><td class="f">endDate</td><td><code class="t">date</code> <span class="drv">⟲</span></td><td><span class="opt">○</span></td><td><b>Rollup:</b> latest child date.</td></tr>
         <tr><td class="f">notes</td><td><code class="t">string</code></td><td><span class="opt">○</span></td><td>Why this variant / trade-offs.</td></tr>
       </tbody>
       </table></div>
-      <div class="note"><b>Budget comparison:</b> each itinerary's rolled-up cost (Σ Finance of its entries) is shown against <code class="t">Trip.budgetTarget</code> — <span class="rec">under / over by X</span> — so variants can be compared side by side before one is <code class="t">selected</code>.</div>
+      <div class="note"><b>Budget comparison:</b> each itinerary's rolled-up cost (Σ Finance of its entries) is shown against <code class="t">Trip.budgetTarget</code> — <span class="rec">under / over by X</span> — so variants can be compared side by side before one is made <code class="t">primary</code>.<br><b>Members &amp; duplication:</b> the variant's roster comes from <span class="ent">ItineraryMember</span> (defaults to all trip members, adjustable). Variants are self-contained — the same booking may be <b>duplicated</b> across itineraries during planning; that's expected, not an error.</div>
     </div>
   </details></div>
 
@@ -332,11 +343,12 @@
       <thead><tr><th>Junction</th><th>Links</th><th>Card.</th><th>Extra fields</th><th>Purpose</th></tr></thead>
       <tbody>
         <tr><td class="f">Trip–Member</td><td class="f">Trip · Member</td><td class="c">* : *</td><td><code class="t">role</code>, <code class="t">traveling</code></td><td>Who is on the trip &amp; in what capacity. (Held on <span class="ent">Member</span> in Phase 0, since members are trip-scoped.)</td></tr>
+        <tr><td class="f">Itinerary–Member</td><td class="f">Itinerary · Member</td><td class="c">* : *</td><td><code class="t">traveling?</code> (override)</td><td>The per-variant roster. Seeded from the trip's members; add/remove or override <code class="t">traveling</code> for a specific variant. Drives that variant's cost-split math.</td></tr>
         <tr><td class="f">Location–Member</td><td class="f">Location · Member</td><td class="c">* : *</td><td><code class="t">arrival?</code>, <code class="t">departure?</code></td><td>Which members are at which leg — supports converging trips (people arrive/leave on different days).</td></tr>
         <tr><td class="f">Finance–Member</td><td class="f">Finance · Member</td><td class="c">* : *</td><td><code class="t">shareAmount</code> / <code class="t">sharePct</code>, <code class="t">isPayee</code>, <code class="t">settled</code></td><td>Bill allocation — split a cost per person, mark who fronted it (payee), track settlement.</td></tr>
       </tbody>
     </table></div>
-    <div class="note"><b>Bill allocation logic (Finance–Member):</b> each <span class="ent">Finance</span> row can be divided among members by explicit amount or percentage (helper: equal split across traveling members). Members flagged <code class="t">isPayee</code> paid it. "Who owes whom" = each member's <code class="t">shareAmount</code> minus what they paid, netted across the trip; <code class="t">settled</code> marks a share reconciled. Only the <b>selected</b> itinerary's allocations are treated as real.</div>
+    <div class="note"><b>Bill allocation logic (Finance–Member):</b> each <span class="ent">Finance</span> row can be divided among members by explicit amount or percentage (helper: equal split across traveling members). Members flagged <code class="t">isPayee</code> paid it. "Who owes whom" = each member's <code class="t">shareAmount</code> minus what they paid, netted across the trip; <code class="t">settled</code> marks a share reconciled. Splits use the variant's <span class="ent">ItineraryMember</span> roster; only the <b>primary</b> itinerary's allocations are treated as real.</div>
   </div></div>
 
   <h2>Derived values (computed, never stored)</h2>
@@ -347,7 +359,7 @@
       <tr><td class="f">Budget variance</td><td><code class="t">Trip.budgetTarget − Itinerary cost</code></td><td>Per itinerary; the compare-variants view.</td></tr>
       <tr><td class="f">Itinerary.start/end</td><td><code class="t">min/max child dates</code></td><td>Rollup of Location/Entry dates; override wins.</td></tr>
       <tr><td class="f">Finance.unpaidAmount</td><td><code class="t">total − paidAmount</code></td><td>Per entry.</td></tr>
-      <tr><td class="f">Per-person balance</td><td><code class="t">Σ shareAmount − Σ paid</code></td><td>From Finance–Member (selected itinerary); drives settlement.</td></tr>
+      <tr><td class="f">Per-person balance</td><td><code class="t">Σ shareAmount − Σ paid</code></td><td>From Finance–Member (primary itinerary); drives settlement.</td></tr>
       <tr><td class="f">Location overlap</td><td><code class="t">date-range intersection</code></td><td>≥2 days &amp; not <code class="t">overlapCleared</code> → warning.</td></tr>
     </tbody>
   </table></div></div>
@@ -355,16 +367,16 @@
   <h2>Open modeling decisions (refine here)</h2>
   <div class="card"><div class="body">
     <ul class="dec">
-      <li><b>One <code class="t">selected</code> itinerary</b> at a time (others draft/archived); allocations count only for it. <span class="rec">Rec: yes.</span></li>
+      <li><b>Members per variant</b> — <span class="ent">ItineraryMember</span> inherits the trip roster, adjustable per itinerary. <span class="rec">Decided ✓.</span></li>
+      <li><b>One <code class="t">primary</code> itinerary</b> is the real trip; duplicate entries across variants are expected during planning. <span class="rec">Decided ✓.</span></li>
       <li><b>Budget granularity</b> — single trip target vs. per-category (lodging/transport/…). <span class="rec">Rec: single target in Phase 0; per-category later.</span></li>
-      <li><b>Dates</b> — rollup at itinerary level + optional trip target window. <span class="rec">Rec: yes.</span></li>
-      <li><b>Members are trip-level</b> and shared across all itineraries. <span class="rec">Rec: yes.</span></li>
-      <li><b>Personal vs. shared entries</b> — express via Location–Member + Finance–Member, or a direct Entry–Member link? <span class="rec">Rec: leg + finance links; add Entry–Member only if needed.</span></li>
+      <li><b>Personal vs. shared entries</b> — express via Itinerary/Location–Member + Finance–Member, or a direct Entry–Member link? <span class="rec">Rec: membership + finance links; add Entry–Member only if needed.</span></li>
       <li><b>subType</b> — controlled enum per <code class="t">type</code> vs. free text. <span class="rec">Rec: controlled list per type, with "other".</span></li>
+      <li><b>Allocation input</b> — explicit <code class="t">shareAmount</code> vs. <code class="t">sharePct</code> vs. equal-split helper. <span class="rec">Rec: store amounts; offer equal-split + % helpers.</span></li>
     </ul>
   </div></div>
 
-  <footer>Trip Planner · Phase 0 · data model draft for review — schemaVersion 0.3.0</footer>
+  <footer>Trip Planner · Phase 0 · data model draft for review — schemaVersion 0.4.0</footer>
 </div>
 </body>
 </html>
